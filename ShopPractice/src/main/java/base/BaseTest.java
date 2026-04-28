@@ -1,41 +1,66 @@
 package base;
 
-import io.github.bonigarcia.wdm.WebDriverManager;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
-import org.testng.annotations.*;
+import org.openqa.selenium.firefox.FirefoxDriver;
+
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+
+import io.github.bonigarcia.wdm.WebDriverManager;
 import utils.ConfigReader;
 
 import java.time.Duration;
 
 public class BaseTest {
 
-    protected WebDriver driver;
+    // Thread-safe driver (best practice)
+    private static ThreadLocal<WebDriver> driver = new ThreadLocal<>();
 
-    public WebDriver getDriver() {
-        return driver;
+    // Getter for driver (used everywhere)
+    public static WebDriver getDriver() {
+        return driver.get();
     }
 
     @BeforeMethod
     public void setup() {
 
         String browser = ConfigReader.get("browser");
+        String url = ConfigReader.get("baseUrl");
+        int timeout = Integer.parseInt(ConfigReader.get("timeout"));
+
+        System.out.println("Launching browser");
+        System.out.println("Browser: " + browser);
 
         if (browser.equalsIgnoreCase("chrome")) {
+
             WebDriverManager.chromedriver().setup();
-            driver = new ChromeDriver();
+            driver.set(new ChromeDriver());
+
+        } else if (browser.equalsIgnoreCase("firefox")) {
+
+            WebDriverManager.firefoxdriver().setup();
+            driver.set(new FirefoxDriver());
         }
 
-        driver.manage().window().maximize();
+        // Maximize and waits
+        getDriver().manage().window().maximize();
+        getDriver().manage().timeouts().implicitlyWait(Duration.ofSeconds(0));
 
-        driver.manage().timeouts()
-                .implicitlyWait(Duration.ofSeconds(3));
+        // Open URL
+        getDriver().get(url);
 
-        driver.get(ConfigReader.get("baseUrl"));
+        System.out.println("Application launched: " + url);
     }
 
     @AfterMethod
-    public void tearDown() {
-        driver.quit();
+    public void teardown() {
+
+        System.out.println("Closing browser");
+
+        if (getDriver() != null) {
+            getDriver().quit();
+            driver.remove(); // important for parallel execution
+        }
     }
 }
